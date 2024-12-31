@@ -43,6 +43,24 @@ function setupDynamicComments(
     }, 500); // Delay in milliseconds (adjust as needed)
   }
 
+  function formatDiffOutput(diff: string, maxLines: number = 10): string {
+    const lines = diff.split('\n');
+    const formattedLines = lines.map(line => {
+      if (line.startsWith('+') && !line.startsWith('+++')) {
+        return `Added: ${line.substring(1)}`;
+      } else if (line.startsWith('-') && !line.startsWith('---')) {
+        return `Removed: ${line.substring(1)}`;
+      }
+      return null;
+    }).filter(line => line !== null);
+  
+    // Limit the number of lines to the specified maximum
+    const limitedLines = formattedLines.slice(0, maxLines);
+  
+    // Join the lines into a single string with markdown code block
+    return '```\n' + limitedLines.join('\n') + (formattedLines.length > maxLines ? '\n... (truncated)' : '') + '\n```';
+  }
+
   const updateDecorations = async (editor: vscode.TextEditor) => {
     const cursorLine = editor.selection.active.line; // Convert to 1-based index
 
@@ -56,8 +74,8 @@ function setupDynamicComments(
 
     if (hotspot) {
       const git = simpleGit(path.dirname(filePath));
-      const commitHash = hotspot.commitHash.split(" ")[0];
-      const diff = await getDiffForCommit(git, commitHash, filePath);
+      const diff = await getDiffForCommit(git, hotspot.commitHash, filePath);
+      const formattedDiff = formatDiffOutput(diff);
 
       const lineText = document.lineAt(cursorLine).text; // Get the full line text
       const lineLength = lineText.length;
@@ -65,7 +83,7 @@ function setupDynamicComments(
       const decorationOptions: vscode.DecorationOptions[] = [
         {
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
-          hoverMessage: `Hash :${commitHash}\n\n${diff}`,
+          hoverMessage: `Hash :${hotspot.commitHash}\n\n${formattedDiff}`,
           renderOptions: {
             after: {
               contentText: ` -> ${hotspot.author} | ${hotspot.date} | ${hotspot.summary}`,
@@ -98,17 +116,17 @@ async function getDiffForCommit(
 ): Promise<string> {
   try {
     // Get the file's relative path from the repo root
-    const relativePath = path.relative(
-      await git.revparse("--show-toplevel"),
-      filePath
-    );
+    // const relativePath = path.relative(
+    //   await git.revparse("--show-toplevel"),
+    //   filePath
+    // );
 
     // const diffOutput = await git.raw(["show", `${commitHash}:${relativePath}`]);
     const diffOutput = await git.raw([
       "diff",
       `${commitHash}^!`,
       "--",
-      relativePath,
+      filePath,
     ]);
 
     return diffOutput;
@@ -163,7 +181,7 @@ async function analyzeGitHistory(filePath: string): Promise<
         const commitInfo = line.split(" ");
         if (commitInfo) {
           currentCommitHash = commitInfo[0];
-          currentResultingLine = parseInt(commitInfo[1], 10) - 1;
+          currentResultingLine = parseInt(commitInfo[2], 10) - 1;
         }
       }
       hotspots[currentResultingLine] = {
