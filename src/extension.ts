@@ -3,8 +3,6 @@ import simpleGit, { SimpleGit } from "simple-git";
 import * as path from "path";
 
 export function activate(context: vscode.ExtensionContext) {
-  console.log("Dynamic Code Annotation is now active!");
-
   const activeEditor = vscode.window.activeTextEditor;
 
   if (activeEditor) {
@@ -43,22 +41,32 @@ function setupDynamicComments(
     }, 500); // Delay in milliseconds (adjust as needed)
   }
 
-  function formatDiffOutput(diff: string, maxLines: number = 10): string {
-    const lines = diff.split('\n');
-    const formattedLines = lines.map(line => {
-      if (line.startsWith('+') && !line.startsWith('+++')) {
-        return `Added: ${line.substring(1)}`;
-      } else if (line.startsWith('-') && !line.startsWith('---')) {
-        return `Removed: ${line.substring(1)}`;
+  function formatDiffOutput(diff: string): string {
+    const lines = diff.split("\n");
+    let formattedDiff = "```diff\n";
+    let regularLine = false;
+
+    lines.forEach((line) => {
+      if (/^([+@-]{2,3}|index|diff)/.test(line)) {
+        return;
+      } else if (line.startsWith("+")) {
+        regularLine = false;
+        formattedDiff += `+ ${line.substring(1)}\n`;
+      } else if (line.startsWith("-")) {
+        regularLine = false;
+        formattedDiff += `- ${line.substring(1)}\n`;
+      } else {
+        if (!regularLine) {
+          formattedDiff += ` .\n .\n .\n`;
+          regularLine = true; 
+          return;
+        }
+        return;
       }
-      return null;
-    }).filter(line => line !== null);
-  
-    // Limit the number of lines to the specified maximum
-    const limitedLines = formattedLines.slice(0, maxLines);
-  
-    // Join the lines into a single string with markdown code block
-    return '```\n' + limitedLines.join('\n') + (formattedLines.length > maxLines ? '\n... (truncated)' : '') + '\n```';
+    });
+
+    formattedDiff += "```\n";
+    return formattedDiff;
   }
 
   const updateDecorations = async (editor: vscode.TextEditor) => {
@@ -70,7 +78,7 @@ function setupDynamicComments(
     // Mocking hotspot data, replace with actual data from analyzeGitHistory()
     const hotspots = await analyzeGitHistory(filePath);
 
-    const hotspot = hotspots.find((hotspot) => hotspot.line === cursorLine);
+    const hotspot = hotspots.find((hotspot) => hotspot.line === cursorLine + 1);
 
     if (hotspot) {
       const git = simpleGit(path.dirname(filePath));
@@ -83,7 +91,7 @@ function setupDynamicComments(
       const decorationOptions: vscode.DecorationOptions[] = [
         {
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
-          hoverMessage: `Hash :${hotspot.commitHash}\n\n${formattedDiff}`,
+          hoverMessage: `Hash :${hotspot.commitHash.slice(0,7)} ${hotspot.author} ${hotspot.date} ${hotspot.summary}\n\n${formattedDiff}`,
           renderOptions: {
             after: {
               contentText: ` -> ${hotspot.author} | ${hotspot.date} | ${hotspot.summary}`,
@@ -115,13 +123,6 @@ async function getDiffForCommit(
   filePath: string
 ): Promise<string> {
   try {
-    // Get the file's relative path from the repo root
-    // const relativePath = path.relative(
-    //   await git.revparse("--show-toplevel"),
-    //   filePath
-    // );
-
-    // const diffOutput = await git.raw(["show", `${commitHash}:${relativePath}`]);
     const diffOutput = await git.raw([
       "diff",
       `${commitHash}^!`,
@@ -161,37 +162,34 @@ async function analyzeGitHistory(filePath: string): Promise<
     } = {};
     const blameLines = blameOutput.split("\n");
 
-    let currentAuthor = "Unknown";
-    let currentSummary = "";
-    let currentDate = "";
+    let hashMap: {
+      [key: string]: { author: string; date: string; summary: string };
+    } = {};
     let currentCommitHash = "";
     let currentResultingLine = 0;
 
-    for (const [_, line] of blameLines.entries()) {
-      if (line.startsWith("author ")) {
-        // Extract the author name
-        currentAuthor = line.substring(7).trim();
-      } else if (line.startsWith("summary ")) {
-        // Extract the commit summary
-        currentSummary = line.substring(8).trim();
-      } else if (line.startsWith("committer-time ")) {
-        // Extract the commit summary
-        currentDate = line.substring(15).trim();
-      } else if (/^\S+\s+\d+\s+\d+/.test(line)) {
+    for (const [i, line] of blameLines.entries()) {
+      if (/^\S+\s+\d+\s+\d+/.test(line)) {
         const commitInfo = line.split(" ");
         if (commitInfo) {
           currentCommitHash = commitInfo[0];
-          currentResultingLine = parseInt(commitInfo[2], 10) - 1;
+          if (!hashMap[currentCommitHash]) {
+            hashMap[currentCommitHash] = {
+              author: blameLines[i + 1].substring(7).trim(),
+              date: blameLines[i + 7].substring(15).trim(),
+              summary: blameLines[i + 9].substring(8).trim(),
+            };
+          }
+          currentResultingLine = parseInt(commitInfo[2], 10);
         }
       }
       hotspots[currentResultingLine] = {
-        author: currentAuthor,
-        summary: currentSummary,
-        date: formatUnixTimestamp(Number(currentDate)),
+        author: hashMap[currentCommitHash].author,
+        summary: hashMap[currentCommitHash].summary,
+        date: formatUnixTimestamp(Number(hashMap[currentCommitHash].date)),
         commitHash: currentCommitHash,
       };
     }
-    console.log(hotspots);
 
     return Object.keys(hotspots).map((line) => ({
       line: parseInt(line),
