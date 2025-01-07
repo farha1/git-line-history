@@ -2,35 +2,83 @@ import * as vscode from "vscode";
 import simpleGit, { SimpleGit } from "simple-git";
 import * as path from "path";
 
+let diffString = '';
+
+// Track if diff view is active
+let isDiffViewActive = false;
+
+// Create and register the diff content provider at extension activation
+const diffContentProvider = new class implements vscode.TextDocumentContentProvider {
+    private _onDidChange = new vscode.EventEmitter<vscode.Uri>();
+    readonly onDidChange = this._onDidChange.event;
+
+    provideTextDocumentContent(uri: vscode.Uri): string {
+        return diffString;
+    }
+
+    update(uri: vscode.Uri) {
+        if (isDiffViewActive) {
+            this._onDidChange.fire(uri);
+        }
+    }
+}();
+
+// Keep track of the current diff view URI
+let currentDiffUri: vscode.Uri | undefined;
+
 export function activate(context: vscode.ExtensionContext) {
+  // Register the provider early
+  context.subscriptions.push(
+      vscode.workspace.registerTextDocumentContentProvider('diffview', diffContentProvider)
+  );
+
   // Register the command to show diff in new file
-  let disposable = vscode.commands.registerCommand('dynamicCodeAnnotation.showDiffInNewFile', async (diff: string) => {
-    const doc = await vscode.workspace.openTextDocument({
-      content: diff,
-      language: 'diff'
-    });
-    // Show the document in a new editor group to the right
-    await vscode.window.showTextDocument(doc, {
-      preview: false,
-      viewColumn: vscode.ViewColumn.Beside,
-      preserveFocus: true
-    });
-    
-    // Make the document read-only by applying a readonly scheme
-    await vscode.workspace.fs.writeFile(doc.uri.with({ scheme: 'untitled' }), Buffer.from(diff));
+  let disposable = vscode.commands.registerCommand('dynamicCodeAnnotation.showDiffInNewFile', async () => {
+      try {
+          isDiffViewActive = true;
+          // Create a URI for a readonly virtual document
+          currentDiffUri = vscode.Uri.parse('diffview://diff-view');
+          
+          // Open the document after the provider is registered
+          const doc = await vscode.workspace.openTextDocument(currentDiffUri);
+          
+          // Set the language mode to diff
+          await vscode.languages.setTextDocumentLanguage(doc, 'diff');
+          
+          // Show the document in a new editor group to the right
+          await vscode.window.showTextDocument(doc, {
+              preview: false,
+              viewColumn: vscode.ViewColumn.Beside,
+              preserveFocus: true
+          });
+
+          // Listen for when the diff document is closed
+          context.subscriptions.push(
+              vscode.workspace.onDidCloseTextDocument(closedDoc => {
+                  if (closedDoc.uri.scheme === 'diffview') {
+                      isDiffViewActive = false;
+                      currentDiffUri = undefined;
+                  }
+              })
+          );
+      } catch (error) {
+          isDiffViewActive = false;
+          currentDiffUri = undefined;
+          vscode.window.showErrorMessage(`Failed to show diff: ${error}`);
+      }
   });
   context.subscriptions.push(disposable);
 
   const activeEditor = vscode.window.activeTextEditor;
 
   if (activeEditor) {
-    setupDynamicComments(activeEditor, context);
+      setupDynamicComments(activeEditor, context);
   }
 
   vscode.window.onDidChangeActiveTextEditor((editor) => {
-    if (editor) {
-      setupDynamicComments(editor, context);
-    }
+      if (editor) {
+          setupDynamicComments(editor, context);
+      }
   });
 }
 
@@ -105,7 +153,7 @@ function setupDynamicComments(
 
       const lineText = document.lineAt(cursorLine).text; // Get the full line text
       const lineLength = lineText.length;
-
+      setDiffString(formattedDiff);
       const decorationOptions: vscode.DecorationOptions[] = [
         {
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
@@ -115,7 +163,7 @@ function setupDynamicComments(
               `**Author**: ${hotspot.author}\n` +
               `**Date**: ${hotspot.date}\n` +
               `**Summary**: ${hotspot.summary}\n\n` +
-              `[Show Diff in New File](command:dynamicCodeAnnotation.showDiffInNewFile?${encodeURIComponent(JSON.stringify(formattedDiff))})`
+              `[Show Diff in New File](command:dynamicCodeAnnotation.showDiffInNewFile)`
             );
             markdown.isTrusted = true;
             return markdown;
@@ -125,6 +173,14 @@ function setupDynamicComments(
       editor.setDecorations(decorationType, decorationOptions);
     } else {
       editor.setDecorations(decorationType, []);
+    }
+  };
+
+  // Create a setter for diffString that triggers content update
+  const setDiffString = (newValue: string) => {
+    diffString = newValue;
+    if (currentDiffUri) {
+        diffContentProvider.update(currentDiffUri);
     }
   };
 
