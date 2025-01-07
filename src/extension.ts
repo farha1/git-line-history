@@ -95,13 +95,6 @@ function setupDynamicComments(
   editor: vscode.TextEditor,
   context: vscode.ExtensionContext
 ) {
-  const decorationType = vscode.window.createTextEditorDecorationType({
-    after: {
-      color: "rgba(150, 150, 150, 0.8)",
-      fontStyle: "italic",
-    },
-  });
-
   function updateDecorationsDebounced(editor: vscode.TextEditor) {
     // Clear the previous timeout if it exists
     if (decorationTimeout) {
@@ -164,6 +157,11 @@ function setupDynamicComments(
 
     const hotspot = hotspots.find((hotspot) => hotspot.line === cursorLine + 1);
 
+    const decorationType = vscode.window.createTextEditorDecorationType({
+      after: {
+        contentText: "  🔍",
+      },
+    });
     if (hotspot) {
       const lineText = document.lineAt(cursorLine).text; // Get the full line text
       const lineLength = lineText.length;
@@ -178,7 +176,9 @@ function setupDynamicComments(
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
           hoverMessage: (() => {
             const markdown = new vscode.MarkdownString(
-              `**Commit**: ${hotspot.commitHash.slice(0, 9)} ~ ${hotspot.summary}\n\n` +
+              `**Commit**: ${hotspot.commitHash.slice(0, 9)} ~ ${
+                hotspot.summary
+              }\n\n` +
                 `**Author**: ${hotspot.author} \n` +
                 `**Date**: ${hotspot.date} \n\n` +
                 `[Show Diff](command:dynamicCodeAnnotation.showDiffInNewFile)`
@@ -188,6 +188,7 @@ function setupDynamicComments(
           })(),
         },
       ];
+      
       editor.setDecorations(decorationType, decorationOptions);
     } else {
       editor.setDecorations(decorationType, []);
