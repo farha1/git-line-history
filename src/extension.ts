@@ -3,6 +3,24 @@ import simpleGit, { SimpleGit } from "simple-git";
 import * as path from "path";
 
 export function activate(context: vscode.ExtensionContext) {
+  // Register the command to show diff in new file
+  let disposable = vscode.commands.registerCommand('dynamicCodeAnnotation.showDiffInNewFile', async (diff: string) => {
+    const doc = await vscode.workspace.openTextDocument({
+      content: diff,
+      language: 'diff'
+    });
+    // Show the document in a new editor group to the right
+    await vscode.window.showTextDocument(doc, {
+      preview: false,
+      viewColumn: vscode.ViewColumn.Beside,
+      preserveFocus: true
+    });
+    
+    // Make the document read-only by applying a readonly scheme
+    await vscode.workspace.fs.writeFile(doc.uri.with({ scheme: 'untitled' }), Buffer.from(diff));
+  });
+  context.subscriptions.push(disposable);
+
   const activeEditor = vscode.window.activeTextEditor;
 
   if (activeEditor) {
@@ -43,7 +61,7 @@ function setupDynamicComments(
 
   function formatDiffOutput(diff: string): string {
     const lines = diff.split("\n");
-    let formattedDiff = "```diff\n";
+    let formattedDiff = "";
     let regularLine = false;
 
     lines.forEach((line) => {
@@ -57,15 +75,15 @@ function setupDynamicComments(
         formattedDiff += `- ${line.substring(1)}\n`;
       } else {
         if (!regularLine) {
-          formattedDiff += ` .\n .\n .\n`;
-          regularLine = true; 
+          formattedDiff += ` .\n .\n`;
+          regularLine = true;
           return;
         }
         return;
       }
     });
 
-    formattedDiff += "```\n";
+    formattedDiff += "...";
     return formattedDiff;
   }
 
@@ -91,12 +109,17 @@ function setupDynamicComments(
       const decorationOptions: vscode.DecorationOptions[] = [
         {
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
-          hoverMessage: `Hash :${hotspot.commitHash.slice(0,7)} ${hotspot.author} ${hotspot.date} ${hotspot.summary}\n\n${formattedDiff}`,
-          renderOptions: {
-            after: {
-              contentText: ` -> ${hotspot.author} | ${hotspot.date} | ${hotspot.summary}`,
-            },
-          },
+          hoverMessage: (() => {
+            const markdown = new vscode.MarkdownString(
+              `**Commit**: ${hotspot.commitHash.slice(0,7)}\n` +
+              `**Author**: ${hotspot.author}\n` +
+              `**Date**: ${hotspot.date}\n` +
+              `**Summary**: ${hotspot.summary}\n\n` +
+              `[Show Diff in New File](command:dynamicCodeAnnotation.showDiffInNewFile?${encodeURIComponent(JSON.stringify(formattedDiff))})`
+            );
+            markdown.isTrusted = true;
+            return markdown;
+          })(),
         },
       ];
       editor.setDecorations(decorationType, decorationOptions);
