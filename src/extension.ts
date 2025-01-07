@@ -178,11 +178,10 @@ function setupDynamicComments(
           range: new vscode.Range(cursorLine, 0, cursorLine, lineLength),
           hoverMessage: (() => {
             const markdown = new vscode.MarkdownString(
-              `**Commit**: ${hotspot.commitHash.slice(0, 7)}\n` +
-                `**Author**: ${hotspot.author}\n` +
-                `**Date**: ${hotspot.date}\n` +
-                `**Summary**: ${hotspot.summary}\n\n` +
-                `[Show Diff in New File](command:dynamicCodeAnnotation.showDiffInNewFile)`
+              `**Commit**: ${hotspot.commitHash.slice(0, 9)} ~ ${hotspot.summary}\n\n` +
+                `**Author**: ${hotspot.author} \n` +
+                `**Date**: ${hotspot.date} \n\n` +
+                `[Show Diff](command:dynamicCodeAnnotation.showDiffInNewFile)`
             );
             markdown.isTrusted = true;
             return markdown;
