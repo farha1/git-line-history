@@ -44,7 +44,7 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       try {
         // Create a URI for a readonly virtual document
-        currentDiffUri = vscode.Uri.parse("diffview://diff-view");
+        currentDiffUri = vscode.Uri.parse("diffview://diff-view/diff.diff");
         setDiffString(currentDiffUri);
 
         // Open the document after the provider is registered
@@ -146,9 +146,22 @@ function setupDynamicComments(
     return formattedDiff;
   }
 
-  const updateDecorations = async (editor: vscode.TextEditor) => {
-    const cursorLine = editor.selection.active.line; // Convert to 1-based index
+  let currentDecorationType: vscode.TextEditorDecorationType | undefined;
 
+  const updateDecorations = async (editor: vscode.TextEditor) => {
+    // Dispose previous decoration
+    if (currentDecorationType) {
+      currentDecorationType.dispose();
+    }
+
+    // Create new decoration type
+    currentDecorationType = vscode.window.createTextEditorDecorationType({
+      after: {
+        contentText: "  🔍",
+      },
+    });
+
+    const cursorLine = editor.selection.active.line; // Convert to 1-based index
     const document = editor.document;
     const filePath = document.uri.fsPath;
 
@@ -156,12 +169,6 @@ function setupDynamicComments(
     const hotspots = await analyzeGitHistory(filePath);
 
     const hotspot = hotspots.find((hotspot) => hotspot.line === cursorLine + 1);
-
-    const decorationType = vscode.window.createTextEditorDecorationType({
-      after: {
-        contentText: "  🔍",
-      },
-    });
     if (hotspot) {
       const lineText = document.lineAt(cursorLine).text; // Get the full line text
       const lineLength = lineText.length;
@@ -188,10 +195,10 @@ function setupDynamicComments(
           })(),
         },
       ];
-      
-      editor.setDecorations(decorationType, decorationOptions);
+
+      editor.setDecorations(currentDecorationType, decorationOptions);
     } else {
-      editor.setDecorations(decorationType, []);
+      editor.setDecorations(currentDecorationType, []);
     }
   };
 
