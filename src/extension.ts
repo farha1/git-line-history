@@ -3,6 +3,7 @@ import simpleGit, { SimpleGit } from "simple-git";
 import * as path from "path";
 
 let diffString = "";
+let selectedLine = 0;
 
 // Create a setter for diffString that triggers content update
 const setDiffString = (diffUri: vscode.Uri) => {
@@ -52,13 +53,22 @@ export function activate(context: vscode.ExtensionContext) {
         // Set the language mode to diff
         await vscode.languages.setTextDocumentLanguage(doc, "diff");
 
-        // Show the document in a new editor group to the right
-        await vscode.window.showTextDocument(doc, {
+        // Get editor reference after showing document
+        const editor = await vscode.window.showTextDocument(doc, {
           preview: false,
           viewColumn: vscode.ViewColumn.Beside,
           preserveFocus: true,
         });
 
+        // Set cursor position (e.g., line 5 (zero-based), character 0)
+        const position = new vscode.Position(selectedLine - 1, 0);
+        editor.selection = new vscode.Selection(position, position);
+
+        // Reveal the position
+        editor.revealRange(
+          new vscode.Range(position, position),
+          vscode.TextEditorRevealType.InCenter
+        );
       } catch (error) {
         vscode.window.showErrorMessage(`Failed to show diff: ${error}`);
       }
@@ -104,27 +114,38 @@ function setupDynamicComments(
     }, 500); // Delay in milliseconds (adjust as needed)
   }
 
-  function formatDiffOutput(diff: string): string {
+  function formatDiffOutput(diff: string, selectedLineText: string): string {
     const lines = diff.split("\n");
     let formattedDiff = "";
     let regularLine = false;
+    let lineCount = 0;
 
     lines.forEach((line) => {
       if (/^([+@-]{2,3}|index|diff)/.test(line)) {
         return;
       } else if (line.startsWith("+")) {
+        const lineText = line.substring(1);
+        lineCount++;
         regularLine = false;
-        formattedDiff += `+ ${line.substring(1)}\n`;
+        if (lineText === selectedLineText) {
+          selectedLine = lineCount;
+        }
+        formattedDiff += `+ ${lineText}\n`;
       } else if (line.startsWith("-")) {
+        const lineText = line.substring(1);
+        lineCount++;
         regularLine = false;
-        formattedDiff += `- ${line.substring(1)}\n`;
+        if (lineText === selectedLineText) {
+          selectedLine = lineCount;
+        }
+        formattedDiff += `- ${lineText}\n`;
       } else {
-        if (!regularLine) {
-          formattedDiff += ` .\n .\n`;
-          regularLine = true;
+        if (regularLine) {
           return;
         }
-        return;
+        lineCount++;
+        formattedDiff += ` ...\n`;
+        regularLine = true;
       }
     });
 
@@ -144,12 +165,13 @@ function setupDynamicComments(
     const hotspot = hotspots.find((hotspot) => hotspot.line === cursorLine + 1);
 
     if (hotspot) {
-      const git = simpleGit(path.dirname(filePath));
-      const diff = await getDiffForCommit(git, hotspot.commitHash, filePath);
-      const formattedDiff = formatDiffOutput(diff);
-
       const lineText = document.lineAt(cursorLine).text; // Get the full line text
       const lineLength = lineText.length;
+
+      const git = simpleGit(path.dirname(filePath));
+      const diff = await getDiffForCommit(git, hotspot.commitHash, filePath);
+      const formattedDiff = formatDiffOutput(diff, lineText);
+
       diffString = formattedDiff;
       const decorationOptions: vscode.DecorationOptions[] = [
         {
