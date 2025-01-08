@@ -5,11 +5,6 @@ import * as path from "path";
 let diffString = "";
 let selectedLine = 0;
 
-// Create a setter for diffString that triggers content update
-const setDiffString = (diffUri: vscode.Uri) => {
-  diffContentProvider.update(diffUri);
-};
-
 // Create and register the diff content provider at extension activation
 const diffContentProvider = new (class
   implements vscode.TextDocumentContentProvider
@@ -19,10 +14,6 @@ const diffContentProvider = new (class
 
   provideTextDocumentContent(uri: vscode.Uri): string {
     return diffString;
-  }
-
-  update(uri: vscode.Uri) {
-    this._onDidChange.fire(uri);
   }
 })();
 
@@ -44,8 +35,7 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       try {
         // Create a URI for a readonly virtual document
-        currentDiffUri = vscode.Uri.parse("diffview://diff-view/diff.diff");
-        setDiffString(currentDiffUri);
+        currentDiffUri = vscode.Uri.parse(`diffview://diff-view/${Date.now()}.diff`);
 
         // Open the document after the provider is registered
         const doc = await vscode.workspace.openTextDocument(currentDiffUri);
@@ -124,7 +114,15 @@ function setupDynamicComments(
           selectedLine = lineCount;
         }
         formattedDiff += `+ ${lineText}\n`;
-      } else if (line.startsWith("-")) {
+      } else if (/^ -/.test(line)) {
+        const lineText = line.substring(2);
+        lineCount++;
+        regularLine = false;
+        if (lineText === selectedLineText) {
+          selectedLine = lineCount;
+        }
+        formattedDiff += `+  ${lineText}\n`;
+      }else if (line.startsWith("-")) {
         const lineText = line.substring(1);
         lineCount++;
         regularLine = false;
@@ -133,6 +131,7 @@ function setupDynamicComments(
         }
         formattedDiff += `- ${lineText}\n`;
       } else {
+        // formattedDiff += `${line}\n`;
         if (regularLine) {
           return;
         }
