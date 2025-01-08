@@ -1,8 +1,9 @@
 {
-  "name": "dynamic-code-annotation",
-  "displayName": "dynamic-code-annotation",
-  "description": "Enter a brief description (e.g., \"Highlights frequently edited code lines\").",
-  "version": "0.0.1",
+  "name": "git-line-history",
+  "displayName": "Git : Line History",
+  "description": "Inspect line git history",
+  "publisher": "DigitalExpand",
+  "version": "0.5.0",
   "engines": {
     "vscode": "^1.96.0"
   },
@@ -13,14 +14,6 @@
     "onStartupFinished"
   ],
   "main": "./dist/extension.js",
-  "contributes": {
-    "commands": [
-      {
-        "command": "extension.showHotspots",
-        "title": "Show Hotspots"
-      }
-    ]
-  },
   "scripts": {
     "vscode:prepublish": "npm run package",
     "compile": "webpack",
