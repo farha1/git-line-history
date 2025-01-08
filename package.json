@@ -1,15 +1,27 @@
 {
   "name": "git-line-history",
   "displayName": "Git : Line History",
-  "description": "Inspect line git history",
-  "publisher": "DigitalExpand",
+  "description": "Inspect line git history and show diff in the editor",
+  "publisher": "dynamicCodeAnnotation",
   "version": "0.5.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/farha1/git-line-history.git"
+  },
   "engines": {
     "vscode": "^1.96.0"
   },
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "git",
+    "diff",
+    "annotation",
+    "history",
+    "blame"
+  ],
+  "icon": "icon.png", 
   "activationEvents": [
     "onStartupFinished"
   ],

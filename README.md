@@ -14,11 +14,16 @@ A VS Code extension that provides dynamic git history annotations and diff viewi
 
 ### 📝 Diff Viewing
 - Click "Show Diff" in the hover message to open a side-by-side diff view
+
+![Picture 1](images/screenshot-1.png)
+
 - Formatted diff view that highlights:
   - Added lines (+)
   - Removed lines (-)
   - Context lines (...)
 - Automatic cursor positioning to the relevant line in the diff
+
+![Picture 2](images/screenshot-2.png)
 
 ### 🚀 Performance Features
 - Smart caching for git history and diffs
@@ -32,3 +37,7 @@ A VS Code extension that provides dynamic git history annotations and diff viewi
 3. Look for the 🔍 indicator at the end of the line
 4. Hover over the line to see its git history
 5. Click "Show Diff" to view the detailed changes
+
+## Notes
+- If syntax highlighting doesn't appear in the diff view, it may be due to your chosen UI theme not providing syntax highlighting for `.diff` files.
+- If text in the line that your cursor is hovering over is not visible in diff view, it may be the line doesn't exist in git diff output or there is no change in the line.
