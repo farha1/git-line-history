@@ -2,7 +2,7 @@
   "name": "git-line-history",
   "displayName": "Git : Line History",
   "description": "Inspect line git history and show diff in the editor",
-  "publisher": "dynamicCodeAnnotation",
+  "publisher": "DigitalExpand",
   "version": "0.5.2",
   "repository": {
     "type": "git",
