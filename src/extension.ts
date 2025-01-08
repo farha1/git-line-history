@@ -57,7 +57,10 @@ export function activate(context: vscode.ExtensionContext) {
         });
 
         // Set cursor position (e.g., line 5 (zero-based), character 0)
-        const position = new vscode.Position(selectedLine - 1, 0);
+        const position = new vscode.Position(
+          selectedLine > 0 ? selectedLine - 1 : 0,
+          0
+        );
         editor.selection = new vscode.Selection(position, position);
 
         // Reveal the position
@@ -274,13 +277,16 @@ async function analyzeGitHistory(filePath: string): Promise<
     commitHash: string;
   }[]
 > {
+  const git: SimpleGit = simpleGit(path.dirname(filePath));
+  const headHash = await git.raw(["rev-parse", "-short", "HEAD"]);
+  // generate cache key
+  const cacheKey = `${filePath}:${headHash}`;
   // Check cache first
-  if (gitHistoryCache.has(filePath)) {
-    return gitHistoryCache.get(filePath)!;
+  if (gitHistoryCache.has(cacheKey)) {
+    return gitHistoryCache.get(cacheKey)!;
   }
 
   try {
-    const git: SimpleGit = simpleGit(path.dirname(filePath));
     const blameOutput = await git.raw(["blame", "-p", filePath]);
 
     // Process blame data
@@ -331,7 +337,7 @@ async function analyzeGitHistory(filePath: string): Promise<
       commitHash: hotspots[parseInt(line)].commitHash,
     }));
 
-    gitHistoryCache.set(filePath, gitHistory);
+    gitHistoryCache.set(cacheKey, gitHistory);
 
     return gitHistory;
   } catch (error) {
