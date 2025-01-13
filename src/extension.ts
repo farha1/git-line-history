@@ -140,7 +140,7 @@ function formatDiff(
   formattedDiff.push("...");
   return {
     formattedDiffOutput: formattedDiff.join("\n"),
-    selectedLine: selectedLine,
+    selectedLine: selectedLine === 0 ? lineCount : selectedLine,
   };
 }
 
