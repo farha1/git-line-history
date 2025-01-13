@@ -3,7 +3,7 @@
   "displayName": "Git : Line History",
   "description": "Inspect line git history and show diff in the editor",
   "publisher": "DigitalExpand",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "repository": {
     "type": "git",
     "url": "https://github.com/farha1/git-line-history.git"
